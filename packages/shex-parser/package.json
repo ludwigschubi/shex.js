@@ -15,7 +15,7 @@
     "parser"
   ],
   "license": "MIT",
-  "main": "./shex-parser.js",
+  "main": "./dist/shex-parser.js",
   "engines": {
     "node": ">=0.10.0"
   },
@@ -29,6 +29,8 @@
   "scripts": {
     "parser": "ts-jison -n ShExJison -t javascript -p lr -o ./lib/ShExJison.js ./lib/ShExJison.jison",
     "test": "cd .. && mocha -C -R dot",
+    "build": "rimraf dist && tsc && npm run parser",
+    "build:browser": "rimraf browser && tsc --outDir browser --module esnext",
     "browser": "browserify shex.js -s ShEx -o browser/shex-parser-browserify.js && uglifyjs browser/shex-parser-browserify.js --comments -mco browser/shex-parser-browserify.min.js"
   },
   "publishConfig": {
