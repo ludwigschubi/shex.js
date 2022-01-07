@@ -1,6 +1,14 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const ShExJison_1 = require("./ShExJison");
+function contextError(e, baseIRI) {
+    // use the lexer's pretty-printing
+    const line = e.location.first_line;
+    const col = e.location.first_column + 1;
+    const posStr = "pos" in e.hash ? "\n" + e.hash.pos : "";
+    return `${baseIRI}\n line: ${line}, column: ${col}: ${e.message}${posStr}`;
+}
 const ShExParserCjsModule = (function () {
-    const ShExJison = require("../lib/ShExJison").Parser;
     // Creates a ShEx parser with the given pre-defined prefixes
     const prepareParser = function (baseIRI, prefixes = {}, schemaOptions = {}) {
         // Create a copy of the prefixes
@@ -9,26 +17,26 @@ const ShExParserCjsModule = (function () {
             prefixesCopy[prefix] = prefixes[prefix];
         // Create a new parser with the given prefixes
         // (Workaround for https://github.com/zaach/jison/issues/241)
-        const parser = new ShExJison();
+        const parser = new ShExJison_1.Parser();
         function runParser() {
             // ShExJison.base = baseIRI || "";
             // ShExJison.basePath = ShExJison.base.replace(/[^\/]*$/, '');
             // ShExJison.baseRoot = ShExJison.base.match(/^(?:[a-z]+:\/*)?[^\/]*/)[0];
-            ShExJison._prefixes = Object.create(prefixesCopy);
-            ShExJison._imports = [];
-            ShExJison._setBase(baseIRI);
-            ShExJison._setFileName(baseIRI);
-            ShExJison.options = schemaOptions;
+            ShExJison_1.Parser._prefixes = Object.create(prefixesCopy);
+            ShExJison_1.Parser._imports = [];
+            ShExJison_1.Parser._setBase(baseIRI);
+            ShExJison_1.Parser._setFileName(baseIRI);
+            ShExJison_1.Parser.options = schemaOptions;
             let errors = [];
-            ShExJison.recoverable = (e) => errors.push(e);
+            ShExJison_1.Parser.recoverable = (e) => errors.push(e);
             let ret = null;
             try {
-                ret = ShExJison.prototype.parse.apply(parser, arguments);
+                ret = ShExJison_1.Parser.prototype.parse.apply(parser, arguments);
             }
             catch (e) {
                 errors.push(e);
             }
-            ShExJison.reset();
+            ShExJison_1.Parser.reset();
             errors.forEach((e) => {
                 if ("hash" in e) {
                     const hash = e.hash;
@@ -47,7 +55,9 @@ const ShExParserCjsModule = (function () {
                 const all = new Error("" +
                     errors.length +
                     " parser errors:\n" +
-                    errors.map((e) => contextError(e)).join("\n"));
+                    errors
+                        .map((e) => contextError(e, baseIRI))
+                        .join("\n"));
                 all.errors = errors;
                 all.parsed = ret;
                 throw all;
@@ -60,21 +70,14 @@ const ShExParserCjsModule = (function () {
         parser._setBase = function (base) {
             baseIRI = base;
         };
-        parser._setFileName = ShExJison._setFileName;
+        parser._setFileName = ShExJison_1.Parser._setFileName;
         parser._setOptions = function (opts) {
-            ShExJison.options = opts;
+            ShExJison_1.Parser.options = opts;
         };
-        parser._resetBlanks = ShExJison._resetBlanks;
-        parser.reset = ShExJison.reset;
-        ShExJison.options = schemaOptions;
+        parser._resetBlanks = ShExJison_1.Parser._resetBlanks;
+        parser.reset = ShExJison_1.Parser.reset;
+        ShExJison_1.Parser.options = schemaOptions;
         return parser;
-        function contextError(e) {
-            // use the lexer's pretty-printing
-            const line = e.location.first_line;
-            const col = e.location.first_column + 1;
-            const posStr = "pos" in e.hash ? "\n" + e.hash.pos : "";
-            return `${baseIRI}\n line: ${line}, column: ${col}: ${e.message}${posStr}`;
-        }
     };
     return {
         construct: prepareParser,

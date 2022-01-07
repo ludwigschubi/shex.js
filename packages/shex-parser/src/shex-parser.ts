@@ -1,3 +1,4 @@
+import { Parser as ShExJison } from "./ShExJison";
 interface ParserSchemaOptions {
   duplicateOption: "ignore" | "replace";
   index: boolean;
@@ -11,9 +12,15 @@ type ContextError = Error & {
   hash: { pos: string };
 };
 
-const ShExParserCjsModule = (function () {
-  const ShExJison = require("../lib/ShExJison").Parser;
+function contextError(e: ContextError, baseIRI: string) {
+  // use the lexer's pretty-printing
+  const line = e.location.first_line;
+  const col = e.location.first_column + 1;
+  const posStr = "pos" in e.hash ? "\n" + e.hash.pos : "";
+  return `${baseIRI}\n line: ${line}, column: ${col}: ${e.message}${posStr}`;
+}
 
+const ShExParserCjsModule = (function () {
   // Creates a ShEx parser with the given pre-defined prefixes
   const prepareParser = function (
     baseIRI: string,
@@ -64,7 +71,9 @@ const ShExParserCjsModule = (function () {
           "" +
             errors.length +
             " parser errors:\n" +
-            errors.map((e) => contextError(e as ContextError)).join("\n")
+            errors
+              .map((e) => contextError(e as ContextError, baseIRI))
+              .join("\n")
         ) as Error & { errors: Error[]; parsed: string };
         all.errors = errors;
         all.parsed = ret;
@@ -85,14 +94,6 @@ const ShExParserCjsModule = (function () {
     parser.reset = ShExJison.reset;
     ShExJison.options = schemaOptions;
     return parser;
-
-    function contextError(e: ContextError) {
-      // use the lexer's pretty-printing
-      const line = e.location.first_line;
-      const col = e.location.first_column + 1;
-      const posStr = "pos" in e.hash ? "\n" + e.hash.pos : "";
-      return `${baseIRI}\n line: ${line}, column: ${col}: ${e.message}${posStr}`;
-    }
   };
 
   return {
