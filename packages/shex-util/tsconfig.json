@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "allowJs": true
+  },
+  "exclude": ["src/shex-parser.tsules"],
+  "include": ["src"]
+}

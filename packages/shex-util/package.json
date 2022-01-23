@@ -15,7 +15,7 @@
     "parser"
   ],
   "license": "MIT",
-  "main": "./shex-util.js",
+  "main": "./dist/shex-util.js",
   "engines": {
     "node": ">=0.10.0"
   },
@@ -27,6 +27,7 @@
   },
   "scripts": {
     "test": "cd .. && mocha -C -R dot",
+    "build": "rimraf dist && tsc",
     "browser": "browserify shex.js -s ShEx -o browser/shex-util-browserify.js && uglifyjs browser/shex-util-browserify.js --comments -mco browser/shex-util-browserify.min.js"
   },
   "publishConfig": {
@@ -40,6 +41,7 @@
     "url": "https://github.com/shexSpec/grammar/issues"
   },
   "devDependencies": {
+    "@types/n3": "^1.10.4",
     "@types/shexj": "^2.1.1"
   }
 }
