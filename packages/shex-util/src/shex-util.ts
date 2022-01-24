@@ -72,8 +72,8 @@ interface Result {
 }
 
 export function extend(
-  base: Record<string, string>,
-  extendWith: Record<string, string>[]
+  base: Record<string, LDTerm | Solution>,
+  extendWith: shapeExpr[]
 ): shapeExpr {
   if (!base) base = {};
   for (
@@ -81,7 +81,8 @@ export function extend(
     i < l && (arg = extendWith[i] || {});
     i++
   )
-    for (let name in arg) base[name] = arg[name];
+    for (let name in arg as Record<string, LDTerm | Solution>)
+      base[name] = (arg as Record<string, LDTerm | Solution>)[name] as LDTerm;
   return base as unknown as shapeExpr;
 }
 
@@ -1858,16 +1859,15 @@ export const ShExUtil = {
         });
       if (values[SX.start])
         ret.start = extend(
-          { id: (values[SX.start] as Solution[])[0].ldterm as string },
-          [shapeExpr((values[SX.start] as Solution[])[0].nested)]
+          { id: (values[SX.start] as Solution[])[0].ldterm as LDTerm },
+          [shapeExpr((values[SX.start] as Solution[])[0].nested as Result)]
         ) as unknown as shapeExpr;
       const shapes = values[SX.shapes];
       if (shapes) {
         ret.shapes = (shapes as Solution[]).map((v) => {
-          return extend(
-            { id: v.ldterm as string },
-            shapeExpr(v.nested)
-          ) as shapeExpr;
+          return extend({ id: v.ldterm as LDTerm }, [
+            shapeExpr(v.nested as Result),
+          ]) as shapeExpr;
         });
       }
       // console.log(ret);
@@ -1875,15 +1875,26 @@ export const ShExUtil = {
     } else {
       throw Error("unknown schema type in " + JSON.stringify(values));
     }
-    function findType(v, elts, f) {
-      const t = v[RDF.type][0].ldterm.substr(SX._namespace.length);
+    function findType(
+      v: Result,
+      elts: Record<
+        string,
+        { nary?: boolean; prop?: string | null; expr?: boolean }
+      >,
+      f: (v: Solution | Result) => shapeExpr
+    ) {
+      const t = (
+        (v[RDF.type] as Solution[] | Result[])[0].ldterm as string
+      ).substr(SX._namespace.length);
       const elt = elts[t];
       if (!elt) return Missed;
-      if (elt.nary) {
+      if (elt.nary && elt.prop) {
         const ret = {
           type: t,
         };
-        ret[elt.prop] = v[SX[elt.prop]].map((e) => {
+        (ret as unknown as Record<string, (LDTerm | shapeExpr | undefined)[]>)[
+          elt.prop
+        ] = (v[SX[elt.prop]] as Solution[]).map((e) => {
           return valueOf(e);
         });
         return ret;
@@ -1892,18 +1903,21 @@ export const ShExUtil = {
           type: t,
         };
         if (elt.prop) {
-          ret[elt.prop] = valueOf(v[SX[elt.prop]][0]);
+          (ret as unknown as Record<string, Solution | string>)[elt.prop] =
+            valueOf((v[SX[elt.prop]] as Solution[])[0]) as Solution | string;
         }
         return ret;
       }
 
-      function valueOf(x) {
+      function valueOf(x: Solution) {
         return elt.expr && "nested" in x
-          ? extend({ id: x.ldterm }, f(x.nested))
+          ? extend({ id: x.ldterm as LDTerm }, [
+              f(x.nested as Solution | Result),
+            ])
           : x.ldterm;
       }
     }
-    function shapeExpr(v) {
+    function shapeExpr(v: Result): shapeExpr {
       // shapeExpr = ShapeOr | ShapeAnd | ShapeNot | NodeConstraint | Shape | ShapeRef | ShapeExternal;
       const elts = {
         ShapeAnd: { nary: true, expr: true, prop: "shapeExprs" },
@@ -1912,44 +1926,61 @@ export const ShExUtil = {
         ShapeRef: { nary: false, expr: false, prop: "reference" },
         ShapeExternal: { nary: false, expr: false, prop: null },
       };
-      const ret = findType(v, elts, shapeExpr);
+      const ret = findType(
+        v,
+        elts,
+        shapeExpr as (v: Solution | Result) => shapeExpr
+      );
       if (ret !== Missed) return ret;
 
-      const t = v[RDF.type][0].ldterm;
+      const t = (v[RDF.type] as Record<string, Solution>)[0].ldterm;
       if (t === SX.Shape) {
         const ret = { type: "Shape" };
         ["closed"].forEach((a) => {
-          if (SX[a] in v) ret[a] = !!v[SX[a]][0].ldterm.value;
+          if (SX[a] in v)
+            (ret as unknown as Record<string, boolean>)[a] = !!(
+              (v[SX[a]] as Record<string, Solution>)[0].ldterm as LDTerm
+            )?.value;
         });
         if (SX.extra in v)
-          ret.extra = v[SX.extra].map((e) => {
-            return e.ldterm;
+          (ret as unknown as Record<string, LDTerm[]>).extra = (
+            v[SX.extra] as Solution[]
+          ).map((e) => {
+            return e.ldterm as LDTerm;
           });
         if (SX.expression in v) {
-          ret.expression =
-            "nested" in v[SX.expression][0]
-              ? extend(
-                  { id: v[SX.expression][0].ldterm },
-                  tripleExpr(v[SX.expression][0].nested)
-                )
-              : v[SX.expression][0].ldterm;
+          (ret as unknown as Record<string, Solution | LDTerm>).expression =
+            "nested" in (v[SX.expression] as Solution[])[0]
+              ? (extend(
+                  { id: (v[SX.expression] as Solution[])[0].ldterm as LDTerm },
+                  [tripleExpr((v[SX.expression] as Solution[])[0].nested)]
+                ) as Solution)
+              : ((v[SX.expression] as Solution[])[0].ldterm as LDTerm);
         }
         if (SX.annotation in v)
-          ret.annotations = v[SX.annotation].map((e) => {
-            return {
-              type: "Annotation",
-              predicate: e.nested[SX.predicate][0].ldterm,
-              object: e.nested[SX.object][0].ldterm,
-            };
-          });
+          (ret as unknown as Record<string, Partial<Solution>[]>).annotations =
+            (v[SX.annotation] as Solution[]).map((e) => {
+              return {
+                type: "Annotation",
+                predicate: ((e.nested as Result)[SX.predicate] as Solution[])[0]
+                  .ldterm as string,
+                object: ((e.nested as Result)[SX.object] as Solution[])[0]
+                  .ldterm,
+              };
+            });
         if (SX.semActs in v)
-          ret.semActs = v[SX.semActs].map((e) => {
+          (ret as unknown as Record<string, Partial<Solution>[]>).semActs = (
+            v[SX.semActs] as Solution[]
+          ).map((e) => {
             const ret = {
               type: "SemAct",
-              name: e.nested[SX.name][0].ldterm,
+              name: ((e.nested as Result)[SX.name] as Solution[])[0].ldterm,
             };
-            if (SX.code in e.nested)
-              ret.code = e.nested[SX.code][0].ldterm.value;
+            if (SX.code in (e.nested as Result))
+              (ret as unknown as { code: string }).code = (
+                ((e.nested as Result)[SX.code] as Solution[])[0]
+                  .ldterm as LDTerm
+              )?.value;
             return ret;
           });
         return ret;
@@ -2072,12 +2103,11 @@ export const ShExUtil = {
           if (SX[a] in v) ret[a] = !!v[SX[a]][0].ldterm.value;
         });
         if (SX.valueExpr in v)
-          ret.valueExpr = extend(
-            { id: v[SX.valueExpr][0].ldterm },
+          ret.valueExpr = extend({ id: v[SX.valueExpr][0].ldterm }, [
             "nested" in v[SX.valueExpr][0]
               ? shapeExpr(v[SX.valueExpr][0].nested)
-              : {}
-          );
+              : ({} as Record<string, LDTerm | Solution>),
+          ]);
         minMaxAnnotSemActs(v, ret);
         return ret;
       } else {

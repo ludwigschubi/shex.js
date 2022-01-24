@@ -8,10 +8,10 @@ const Visitor = require("@shexjs/visitor");
 const Hierarchy = require("hierarchy-closure");
 const Missed = {}; // singleton
 const UNBOUNDED = -1;
-function extend(base) {
+function extend(base, extendWith) {
     if (!base)
         base = {};
-    for (let i = 1, l = arguments.length, arg; i < l && (arg = arguments[i] || {}); i++)
+    for (let i = 1, l = extendWith.length, arg; i < l && (arg = extendWith[i] || {}); i++)
         for (let name in arg)
             base[name] = arg[name];
     return base;
@@ -1552,11 +1552,13 @@ exports.ShExUtil = {
                     return e.ldterm;
                 });
             if (values[namespaces_1.SX.start])
-                ret.start = extend({ id: values[namespaces_1.SX.start][0].ldterm }, shapeExpr(values[namespaces_1.SX.start][0].nested));
+                ret.start = extend({ id: values[namespaces_1.SX.start][0].ldterm }, [shapeExpr(values[namespaces_1.SX.start][0].nested)]);
             const shapes = values[namespaces_1.SX.shapes];
             if (shapes) {
                 ret.shapes = shapes.map((v) => {
-                    return extend({ id: v.ldterm }, shapeExpr(v.nested));
+                    return extend({ id: v.ldterm }, [
+                        shapeExpr(v.nested),
+                    ]);
                 });
             }
             // console.log(ret);
@@ -1570,7 +1572,7 @@ exports.ShExUtil = {
             const elt = elts[t];
             if (!elt)
                 return Missed;
-            if (elt.nary) {
+            if (elt.nary && elt.prop) {
                 const ret = {
                     type: t,
                 };
@@ -1584,13 +1586,14 @@ exports.ShExUtil = {
                     type: t,
                 };
                 if (elt.prop) {
-                    ret[elt.prop] = valueOf(v[namespaces_1.SX[elt.prop]][0]);
+                    ret[elt.prop] =
+                        valueOf(v[namespaces_1.SX[elt.prop]][0]);
                 }
                 return ret;
             }
             function valueOf(x) {
                 return elt.expr && "nested" in x
-                    ? extend({ id: x.ldterm }, f(x.nested))
+                    ? extend({ id: x.ldterm }, [f(x.nested)])
                     : x.ldterm;
             }
         }
@@ -1611,7 +1614,7 @@ exports.ShExUtil = {
                 const ret = { type: "Shape" };
                 ["closed"].forEach((a) => {
                     if (namespaces_1.SX[a] in v)
-                        ret[a] = !!v[namespaces_1.SX[a]][0].ldterm.value;
+                        ret[a] = !!v[namespaces_1.SX[a]][0].ldterm?.value;
                 });
                 if (namespaces_1.SX.extra in v)
                     ret.extra = v[namespaces_1.SX.extra].map((e) => {
@@ -1620,17 +1623,20 @@ exports.ShExUtil = {
                 if (namespaces_1.SX.expression in v) {
                     ret.expression =
                         "nested" in v[namespaces_1.SX.expression][0]
-                            ? extend({ id: v[namespaces_1.SX.expression][0].ldterm }, tripleExpr(v[namespaces_1.SX.expression][0].nested))
+                            ? extend({ id: v[namespaces_1.SX.expression][0].ldterm }, [tripleExpr(v[namespaces_1.SX.expression][0].nested)])
                             : v[namespaces_1.SX.expression][0].ldterm;
                 }
                 if (namespaces_1.SX.annotation in v)
-                    ret.annotations = v[namespaces_1.SX.annotation].map((e) => {
-                        return {
-                            type: "Annotation",
-                            predicate: e.nested[namespaces_1.SX.predicate][0].ldterm,
-                            object: e.nested[namespaces_1.SX.object][0].ldterm,
-                        };
-                    });
+                    ret.annotations =
+                        v[namespaces_1.SX.annotation].map((e) => {
+                            return {
+                                type: "Annotation",
+                                predicate: e.nested[namespaces_1.SX.predicate][0]
+                                    .ldterm,
+                                object: e.nested[namespaces_1.SX.object][0]
+                                    .ldterm,
+                            };
+                        });
                 if (namespaces_1.SX.semActs in v)
                     ret.semActs = v[namespaces_1.SX.semActs].map((e) => {
                         const ret = {
@@ -1638,7 +1644,8 @@ exports.ShExUtil = {
                             name: e.nested[namespaces_1.SX.name][0].ldterm,
                         };
                         if (namespaces_1.SX.code in e.nested)
-                            ret.code = e.nested[namespaces_1.SX.code][0].ldterm.value;
+                            ret.code = e.nested[namespaces_1.SX.code][0]
+                                .ldterm?.value;
                         return ret;
                     });
                 return ret;
